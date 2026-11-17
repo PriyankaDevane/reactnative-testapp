@@ -25,7 +25,17 @@ export default function App() {
   for (const subscription of subscriptions) {
     if (subscription.status !== "active" || !subscription.renewalDate) continue;
 
-    const renewal = dayjs(subscription.renewalDate);
+    const firstRenewal = dayjs(subscription.renewalDate);
+    let renewal = firstRenewal;
+    const period = subscription.billing === "Monthly" ? "month"
+      : subscription.billing === "Yearly" ? "year" : null;
+
+    if (period) {
+      // Calculate each cycle from the original date to preserve month-end renewals.
+      for (let cycles = 1; renewal.isBefore(now); cycles++) {
+        renewal = firstRenewal.add(cycles, period);
+      }
+    }
     if (!renewal.isValid() || renewal.isBefore(now) || renewal.isAfter(windowEnd)) continue;
 
     upcoming.push({
