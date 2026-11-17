@@ -1,21 +1,49 @@
 import {
   HOME_BALANCE,
-  HOME_SUBSCRIPTIONS,
   HOME_USER,
   UPCOMING_SUBSCRIPTIONS,
 } from "@/constants/data";
 import { icons } from "@/constants/icons";
 import images from "@/constants/images";
+import CreateSubscriptionModal from "@/src/components/CreateSubscriptionModal";
 import ListHeading from "@/src/components/ListHeading";
 import SubscriptionCard from "@/src/components/SubscriptionCard";
+import { useSubscriptions } from "@/src/components/SubscriptionsProvider";
 import UpcomingSubscriptionCard from "@/src/components/UpcomingSubscriptionCard";
 import dayjs from "dayjs";
 import { useState } from "react";
-import { FlatList, Image, Text, View } from "react-native";
+import { FlatList, Image, Pressable, Text, View } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 
 export default function App() {
   const [expandedID, setExpandedID] = useState<string | null>(null);
+  const { subscriptions, addSubscription } = useSubscriptions();
+  const [isCreateModalVisible, setCreateModalVisible] = useState(false);
+  const now = dayjs();
+  const windowEnd = now.add(7, "day");
+  const upcoming = [...UPCOMING_SUBSCRIPTIONS];
+  for (const subscription of subscriptions) {
+    if (subscription.status !== "active" || !subscription.renewalDate) continue;
+
+    const firstRenewal = dayjs(subscription.renewalDate);
+    let renewal = firstRenewal;
+    const period = subscription.billing === "Monthly" ? "month"
+      : subscription.billing === "Yearly" ? "year" : null;
+
+    if (period) {
+      // Calculate each cycle from the original date to preserve month-end renewals.
+      for (let cycles = 1; renewal.isBefore(now); cycles++) {
+        renewal = firstRenewal.add(cycles, period);
+      }
+    }
+    if (!renewal.isValid() || renewal.isBefore(now) || renewal.isAfter(windowEnd)) continue;
+
+    upcoming.push({
+      ...subscription,
+      daysLeft: Math.ceil(renewal.diff(now, "day", true)),
+    });
+  }
+  upcoming.sort((first, second) => first.daysLeft - second.daysLeft);
 
   return (
     <SafeAreaView className="flex-1 bg-background p-5 ">
@@ -28,7 +56,14 @@ export default function App() {
                 <Text className="home-user-name">{HOME_USER.name} </Text>
               </View>
 
-              <Image source={icons.add} className="home-add-icon" />
+              <Pressable
+                accessibilityLabel="Add subscription"
+                accessibilityRole="button"
+                hitSlop={8}
+                onPress={() => setCreateModalVisible(true)}
+              >
+                <Image source={icons.add} className="home-add-icon" />
+              </Pressable>
             </View>
 
             <View className="home-balance-card">
@@ -46,7 +81,7 @@ export default function App() {
             <View className="mb-5">
               <ListHeading title="Upcoming" />
               <FlatList
-                data={UPCOMING_SUBSCRIPTIONS}
+                data={upcoming}
                 renderItem={({ item }) => (
                   <UpcomingSubscriptionCard {...item} />
                 )}
@@ -64,7 +99,7 @@ export default function App() {
           </>
         )}
         style={{ flex: 1 }}
-        data={HOME_SUBSCRIPTIONS}
+        data={subscriptions}
         keyExtractor={(item) => item.id}
         renderItem={({ item }) => (
           <SubscriptionCard
@@ -84,6 +119,11 @@ export default function App() {
           <Text className="home-empty-state">No subscriptions yet</Text>
         }
         contentContainerClassName="pb-20"
+      />
+      <CreateSubscriptionModal
+        visible={isCreateModalVisible}
+        onClose={() => setCreateModalVisible(false)}
+        onCreate={addSubscription}
       />
     </SafeAreaView>
   );

@@ -1,5 +1,6 @@
 import { tabs } from "@/constants/data";
 import { colors, components } from "@/constants/theme";
+import { SubscriptionsProvider } from "@/src/components/SubscriptionsProvider";
 import clsx from "clsx";
 import { Tabs } from "expo-router";
 import { Image, View } from "react-native";
@@ -61,4 +62,10 @@ const TabLayout = () => {
   );
 };
 
-export default TabLayout;
+export default function TabsWithSubscriptions() {
+  return (
+    <SubscriptionsProvider>
+      <TabLayout />
+    </SubscriptionsProvider>
+  );
+}
